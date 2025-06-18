@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>قائمة طعام النيل غورميه - كتاب متقلب الصفحات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* General body styling for background and font */
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #fdfaf6;
+            overflow: hidden; /* Prevent scrollbars during animation */
+        }
+        /* Container for the entire book to center it on the screen */
+        .book-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+        }
+        /* Styling for the book itself, defining its size and perspective for 3D flip effect */
+        .book {
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            position: relative;
+            perspective: 2500px; /* Stronger perspective for a more pronounced 3D effect */
+        }
+        /* Styling for individual pages within the book */
+        .page {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-style: preserve-3d; /* Allows 3D transformations on children */
+            transition: transform 1s ease-in-out; /* Smooth transition for flipping */
+            transform-origin: left center; /* Pivot point for the flip animation */
+            display: none; /* Hidden by default, controlled by JS */
+        }
+        /* Active page, visible and on top */
+        .page.active {
+            display: block;
+            z-index: 10;
+        }
+        /* Flipped page, rotated 180 degrees and behind the active page */
+        .page.flipped {
+            transform: rotateY(-180deg);
+            z-index: 9; /* Lower z-index so active page appears on top */
+        }
+        /* Front side of each page (only one side used for simplicity) */
+        .page-front {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; /* Hides the back of the element during flip */
+            background-color: #ffffff; /* White background for pages */
+            border-radius: 12px; /* Rounded corners for a softer look */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); /* Subtle shadow for depth */
+            padding: 1.5rem 2rem; /* Inner spacing */
+            overflow-y: auto; /* Allows scrolling for longer content */
+            border: 1px solid #e2dbc4; /* Light border for page separation */
+        }
+        /* Content wrapper inside each page */
+        .page-content {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem; /* Spacing between categories */
+        }
+        /* Styling for category titles */
+        .category-title {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #8c6a4d; /* Earthy brown color */
+            border-bottom: 2px solid #c8a65e; /* Gold-like underline */
+            padding-bottom: 0.5rem;
+            margin-top: 1rem;
+            text-align: center;
+        }
+        /* Grid layout for each menu item to align name/desc and price */
+        .menu-item {
+            display: grid;
+            grid-template-columns: 1fr auto; /* Name/desc takes full width, price auto */
+            gap: 0.5rem 1rem; /* Spacing between rows and columns */
+            padding-bottom: 1rem;
+            border-bottom: 1px dashed #dcd3b8; /* Dashed separator */
+        }
+        /* Remove border for the last item in a category */
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+        /* Styling for menu item name */
+        .item-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #3d3026; /* Dark brown for text */
+        }
+        /* Styling for menu item price */
+        .item-price {
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #a08562; /* Muted gold for prices */
+        }
+        /* Styling for menu item description */
+        .item-desc {
+            grid-column: 1 / -1; /* Description spans both columns */
+            color: #6b5b4c; /* Medium brown for description text */
+            font-size: 0.95rem;
+        }
+        /* Navigation buttons container */
+        .nav-buttons {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 1rem;
+            z-index: 100; /* Ensures buttons are on top */
+        }
+        /* Styling for navigation buttons */
+        .nav-btn {
+            background-color: #8c6a4d; /* Earthy brown */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s; /* Smooth hover effects */
+        }
+        .nav-btn:hover {
+            background-color: #6b5b4c; /* Darker brown on hover */
+            transform: translateY(-2px); /* Slight lift effect */
+        }
+        /* Disabled state for navigation buttons */
+        .nav-btn:disabled {
+            background-color: #c8bba9; /* Lighter, muted brown when disabled */
+            cursor: not-allowed;
+            transform: translateY(0); /* No lift when disabled */
+        }
+        /* Page number display */
+        .page-number {
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #a08562; /* Muted gold for page numbers */
+            font-size: 0.9rem;
+        }
+        /* Header information block */
+        .header-info {
+            text-align: center;
+            padding: 1rem;
+            background-color: #8c6a4d;
+            color: white;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 768px) {
+            .page-front {
+                padding: 1rem 1.25rem;
+            }
+            .category-title { font-size: 1.4rem; }
+            .item-name, .item-price { font-size: 1rem; }
+        }
+        /* Custom style for the Grill pricing header */
+        .grill-price-header {
+            text-align: right; /* Align to the right for RTL */
+            font-size: 0.9rem;
+            color: #6b5b4c;
+            margin-bottom: 0.5rem;
+            padding-right: 1rem; /* Adjust padding to align with prices */
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 200; /* Above everything else */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4); /* Semi-transparent black background */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px); /* Blurred background */
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            max-width: 90%;
+            width: 450px;
+            text-align: center;
+            position: relative;
+            animation: fadeInScale 0.3s ease-out; /* Simple animation */
+        }
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #333;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .modal-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #8c6a4d;
+            margin-bottom: 1rem;
+        }
+        .modal-text {
+            font-size: 1.1rem;
+            color: #3d3026;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        .modal-loading {
+            font-size: 1.2rem;
+            color: #a08562;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="book-container">
+        <div class="book" id="book">
+            <!-- Page 1: Soups & Salads -->
+            <div class="page active">
+                <div class="page-front">
+                    <div class="page-content">
+                        <div class="header-info">
+                            <h1 class="text-2xl font-bold">النيل غورميه</h1>
+                            <p>مع النيل غورمية هتدوق طعم #مصر</p>
+                            <p>لطلب الاوردرات او الاستفسارات : 0554099255</p>
+                            <p>البرشا جنوب 3 أرجان, بناية روز بالاس - محل رقم 15</p>
+                        </div>
+                        <div>
+                            <h2 class="category-title">الشوربة | Soups</h2>
+                            <div class="menu-item"><div><p class="item-name">شوربة عدس</p><p class="item-desc">حساء عدس دافئ غني بالتوابل الشرقية</p></div><p class="item-price">15 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">شوربة لسان عصفور</p><p class="item-desc">حساء لسان العصفور مع الخضار والتوابل</p></div><p class="item-price">15 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">شوربة كوارع</p><p class="item-desc">شوربة كوارع غنية ولذيذة تقدم بالطريقة المصرية التقليدية</p></div><p class="item-price">30 AED</p></div>
+                        </div>
+                        <div>
+                            <h2 class="category-title">السلطات | Salads</h2>
+                            <div class="menu-item"><div><p class="item-name">سلطة بلدي</p><p class="item-desc">سلطة خضراء مصرية طازجة مع طماطم وخيار وبقدونس</p></div><p class="item-price">15 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">تبولة</p><p class="item-desc">سلطة برغل مع بقدونس وطماطم ونعناع وليمون</p></div><p class="item-price">20 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">حمص</p><p class="item-desc">حمص مهروس مع طحينة ولمسة زيت زيتون وليمون</p></div><p class="item-price">20 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">بابا غنوج</p><p class="item-desc">باذنجان مشوي مهروس مع طحينة وثوم وليمون</p></div><p class="item-price">20 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">طحينة</p><p class="item-desc">صلصة الطحينة الكلاسيكية بنكهة الليمون والثوم</p></div><p class="item-price">18 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">تومية</p><p class="item-desc">صلصة ثومية مصرية كريمية بنكهة الثوم القوية</p></div><p class="item-price">18 AED</p></div>
+                        </div>
+                    </div>
+                    <div class="page-number">1 / 8</div>
+                </div>
+            </div>
+
+            <!-- Page 2: Appetizers & Mahashi -->
+            <div class="page">
+                <div class="page-front">
+                    <div class="page-content">
+                             <div>
+                                <h2 class="category-title">مقبلات ساخنة | Hot Appetizers</h2>
+                                <div class="menu-item"><div><p class="item-name">سجق إسكندراني</p><p class="item-desc">سجق بلدي مطهو مع فلفل وطماطم وتوابل إسكندراني</p></div><p class="item-price">40 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">كبدة إسكندراني</p><p class="item-desc">شرائح كبدة مع بصل وفلفل وتوابل إسكندرانية</p></div><p class="item-price">35 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">1/4 فراخ محمرة</p><p class="item-desc">ربع دجاجة مقلية ذهبية ومقرمشة</p></div><p class="item-price">15 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">بطاطس مقلية</p><p class="item-desc">بطاطس مقلية ذهبية مقرمشة</p></div><p class="item-price">15 AED</p></div>
+                            </div>
+                            <div>
+                                <h2 class="category-title">المحاشي | Stuffed Vegetables</h2>
+                                <div class="menu-item"><div><p class="item-name">ممبار</p><p class="item-desc">أمعاء محشوة بالأرز والتوابل ومطهية حتى النضج</p></div><p class="item-price">40 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">ورق عنب</p><p class="item-desc">أوراق عنب محشوة بالأرز والخضار والأعشاب</p></div><p class="item-price">30 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">محشي كرنب</p><p class="item-desc">أوراق كرنب محشوة بالأرز واللحم المفروم والتوابل</p></div><p class="item-price">30 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">محاشي مشكلة</p><p class="item-desc">تشكيلة من الخضار المحشية بالأرز والتوابل، تقدم مع صلصة الطماطم العطرية</p></div><p class="item-price">40 AED</p></div>
+                            </div>
+                    </div>
+                    <div class="page-number">2 / 8</div>
+                </div>
+            </div>
+
+            <!-- Page 3: Nile Specialties -->
+            <div class="page">
+                <div class="page-front">
+                    <div class="page-content">
+                        <div>
+                            <h2 class="category-title">اطباق النيل المميزة</h2>
+                            <div class="menu-item"><div><p class="item-name">مكرونة بشاميل</p><p class="item-desc">معكرونة بالباشاميل مع طبقات من اللحم المفروم وصلصة البشاميل الكريمية</p></div><p class="item-price">35 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">معكرونة بالسجق الشرقي</p><p class="item-desc">معكرونة ممزوجة بالسجق الشرقي الحار وصلصة الطماطم العطرية</p></div><p class="item-price">35 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">رقاق باللحم المفروم</p><p class="item-desc">رقاق مقرمش محشو باللحم المفروم المتبل ومخبوز</p></div><p class="item-price">30 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">إسكالوب دجاج</p><p class="item-desc">شرائح دجاج طرية مغطاة بالبقسماط ومقلية حتى تصبح ذهبية</p></div><p class="item-price">40 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">فتة بمكعبات لحم بقري</p><p class="item-desc">فتة أرز وعيش محمص مع مكعبات لحم بقري وصوص زبادي وثوم</p></div><p class="item-price">55 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">فتة موزة ضاني</p><p class="item-desc">أرز وعيش مع موزة ضاني مطهوة ببطء، مغطاة بصلصة الزبادي والثوم</p></div><p class="item-price">60 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">فتة مع كوارع</p><p class="item-desc">فتة أرز وعيش مع شوربة كوارع لذيذة مغطاة بصلصة الزبادي والثوم</p></div><p class="item-price">55 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">دجاجة كاملة محشوة بالأرز</p><p class="item-desc">دجاجة كاملة محشوة بالأرز المتبل والمكسرات، مخبوزة</p></div><p class="item-price">50 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">حمام محشو بالأرز</p><p class="item-desc">حمام محشو بالأرز المصري المتبل والمطهو حتى النضج</p></div><p class="item-price">60/110 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">حمام محشو بالفريك</p><p class="item-desc">حمام محشو بحبوب الفريك المتبلة بالأعشاب، مطهو حتى يصبح طرياً</p></div><p class="item-price">65/115 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">نصف بطة مع محاشي</p><p class="item-desc">نصف بطة محمرة تقدم مع أصناف المحاشي المتنوعة</p></div><p class="item-price">110 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">نصف بطة مشوية بالفرن</p><p class="item-desc">نصف بطة مشوية في الفرن مع أرز شرقي معطر بالتوابل</p></div><p class="item-price">100 AED</p></div>
+                            <div class="menu-item"><div><p class="item-name">كتف ضاني بالفرن</p><p class="item-desc">كتف ضاني مطهو ببطء في الفرن مع أعشاب وتوابل شرقية</p></div><p class="item-price">200 AED</p></div>
+                        </div>
+                    </div>
+                    <div class="page-number">3 / 8</div>
+                </div>
+            </div>
+            
+            <!-- Page 4: Grills -->
+            <div class="page">
+                     <div class="page-front">
+                        <div class="page-content">
+                            <div>
+                                <h2 class="category-title">مشاوي النيل | Grills Al-Nile</h2>
+                                <!-- Added pricing header for grills -->
+                                <div class="grill-price-header">طلب | كيلو</div>
+                                <div class="menu-item"><div><p class="item-name">كباب</p><p class="item-desc">لحم كباب مشوي متبل بالأعشاب والتوابل الشرقية</p></div><p class="item-price">80/200 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">كفتة</p><p class="item-desc">كفتة لحم مشوية على الفحم مع بهارات خاصة</p></div><p class="item-price">60/160 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">ريش ضاني مشوية</p><p class="item-desc">ريش ضاني طرية مشوية بعناية حتى تصبح ذهبية</p></div><p class="item-price">80/200 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">طرب</p><p class="item-desc">مزيج لحم وكبدة مشوي ملفوف بالدهن، بنكهة فريدة</p></div><p class="item-price">70/180 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">شيش طاووق</p><p class="item-desc">شيش طاووق دجاج متبل ومشوي على الفحم</p></div><p class="item-price">50/140 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">كبدة مشوية</p><p class="item-desc">شرائح كبدة مشوية مع أعشاب وتوابل شرقية</p></div><p class="item-price">40 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">سجق مشوي</p><p class="item-desc">سجق مصري مشوي على الفحم مع نكهة مدخنة</p></div><p class="item-price">45 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">حواوشي</p><p class="item-desc">رغيف خبز محشو باللحم المفروم المتبل ومشوي</p></div><p class="item-price">22 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">صدور دجاج مشوية</p><p class="item-desc">صدور دجاج مشوية متبلة بالأعشاب تقدم طرية وصحية</p></div><p class="item-price">40 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">موزة مشوية</p><p class="item-desc">موزة ضاني مشوية على الفحم مع تتبيلة شرقية</p></div><p class="item-price">60 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">نصف فرخة مشوية</p><p class="item-desc">نصف فرخة مشوية على الفحم مع تتبيلة شرقية</p></div><p class="item-price">35 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">مشاوي مشكلة نايل جورميه</p><p class="item-desc">تشكيلة من المشاوي المصرية كباب، كفتة، شيش طاووق، ريش، وسجق</p></div><p class="item-price">110/220 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">مشاوي مشكلة لحوم</p><p class="item-desc">تشكيلة مشاوي لحوم متنوعة تضم كباب، كفتة، ريش وطرب</p></div><p class="item-price">100/200 AED</p></div>
+                            </div>
+                        </div>
+                        <div class="page-number">4 / 8</div>
+                     </div>
+            </div>
+            
+            <!-- Page 5: Tagens -->
+            <div class="page">
+                     <div class="page-front">
+                        <div class="page-content">
+                             <div>
+                                <h2 class="category-title">طواجن و خضار | Vegetables and Tagens</h2>
+                                 <div class="menu-item"><div><p class="item-name">ملوخية سادة</p><p class="item-desc">حساء ملوخية مصري كلاسيكي يقدم ساخناً</p></div><p class="item-price">38 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">ملوخية بالدجاج</p><p class="item-desc">ملوخية مطبوخة مع قطع دجاج طرية</p></div><p class="item-price">49 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">ملوخية باللحم</p><p class="item-desc">ملوخية غنية مع مكعبات لحم مقلية ومذاق أصيل</p></div><p class="item-price">54 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">طاجن مسقعة باللحم المفروم</p><p class="item-desc">طاجن مسقعة باللحم المفروم والبطاطس والباذنجان</p></div><p class="item-price">40 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">طاجن مسقعة بالبشاميل</p><p class="item-desc">طاجن مسقعة بالبشاميل الكريمي مع باذنجان ولحم مفروم</p></div><p class="item-price">45 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">طاجن بطاطس بالدجاج</p><p class="item-desc">طاجن بطاطس مع قطع دجاج متبلة ومخبوزة</p></div><p class="item-price">45 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">طاجن بطاطس باللحم</p><p class="item-desc">طاجن بطاطس مع لحم بقري مطهو ببطء في صلصة طماطم</p></div><p class="item-price">45 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">ورقة لحمة</p><p class="item-desc">شرائح لحم بقري مطهوة في الفرن مع الخضروات والتوابل</p></div><p class="item-price">50 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">طاجن بامية باللحم</p><p class="item-desc">طاجن بامية باللحم، لحم بقري مطهو مع البامية في صلصة غنية</p></div><p class="item-price">45 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">طاجن لحم بالبصل</p><p class="item-desc">لحم مطهو ببطء مع بصل متكرمل وتوابل</p></div><p class="item-price">45 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">عكاوي بالبصل</p><p class="item-desc">عكاوي مطهوة بالبصل حتى تصبح طرية وغنية بالنكهات</p></div><p class="item-price">46 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">ورق عنب بالكوارع</p><p class="item-desc">ورق عنب محشو يقدم مع شوربة كوارع لذيذة</p></div><p class="item-price">50 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">طاجن موزة بالبطاطس</p><p class="item-desc">موزة ضاني مطهوة مع البطاطس في طاجن عطري بالبهارات</p></div><p class="item-price">65 AED</p></div>
+                            </div>
+                        </div>
+                        <div class="page-number">5 / 8</div>
+                     </div>
+            </div>
+
+            <!-- Page 6: Feteer -->
+            <div class="page">
+                     <div class="page-front">
+                        <div class="page-content">
+                            <div>
+                                <h2 class="category-title">الفطير المصري | The Egyptian Feteer</h2>
+                                <div class="menu-item"><div><p class="item-name">فطيرة مشلتت سادة</p><p class="item-desc">فطير مصري تقليدي هش وغني بالطبقات يقدم مع العسل أو الجبن</p></div><p class="item-price">69 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">فطيرة مكس جبن</p><p class="item-desc">فطير محشو بمزيج من الجبن المختلفة الذائبة بنكهة شرقية</p></div><p class="item-price">49 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">فطيرة مكس لحوم</p><p class="item-desc">فطير محشو بتشكيلة لحوم شهية متبلة ومطهوة</p></div><p class="item-price">59 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">فطيرة خضار مشكلة</p><p class="item-desc">فطير محشو بخضروات طازجة متبلة ومخبوزة</p></div><p class="item-price">49 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">فطيرة حلو النيل</p><p class="item-desc">فطير حلو معد على طريقة النيل مع عسل وسكر بودرة وقرفة</p></div><p class="item-price">55 AED</p></div>
+                            </div>
+                        </div>
+                        <div class="page-number">6 / 8</div>
+                     </div>
+            </div>
+            
+            <!-- Page 7: Side Dish & Muammar Rice -->
+            <div class="page">
+                     <div class="page-front">
+                        <div class="page-content">
+                            <div>
+                                <h2 class="category-title">أرز معمر | Muammar Rice</h2>
+                                <div class="menu-item"><div><p class="item-name">أرز معمر سادة</p><p class="item-desc">أرز مصري مطبوخ في الفرن مع حليب وسمن</p></div><p class="item-price">30 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">أرز معمر باللحم</p><p class="item-desc">أرز بالفرن مع قطع لحم بقري وتوابل شرقية</p></div><p class="item-price">45 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">رز معمر بالحمام</p><p class="item-desc">أرز معمر محشو بالحمام طبق مصري فاخر بنكهة غنية</p></div><p class="item-price">55 AED</p></div>
+                            </div>
+                             <div>
+                                <h2 class="category-title">أطباق جانبية | Side Dish</h2>
+                                <div class="menu-item"><div><p class="item-name">أرز بالشعيرية</p><p class="item-desc">أرز مصري مطبوخ مع شعيرية ذهبية، طبق جانبي كلاسيكي</p></div><p class="item-price">15 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">أرز ابيض</p><p class="item-desc">أرز أبيض مفلفل، خفيف ومثالي مع جميع الأطباق</p></div><p class="item-price">15 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">رز بالخلطة</p><p class="item-desc">أرز مصري مطبوخ مع المكسرات والزبيب والتوابل الشرقية</p></div><p class="item-price">18 AED</p></div>
+                            </div>
+                        </div>
+                        <div class="page-number">7 / 8</div>
+                     </div>
+            </div>
+
+            <!-- Page 8: Feasts -->
+            <div class="page">
+                     <div class="page-front">
+                        <div class="page-content">
+                            <div>
+                                <h2 class="category-title">الولائم والصواني | Feasts & Trays</h2>
+                                <div class="menu-item"><div><p class="item-name">وليمة فخدة ضاني</p><p class="item-desc">فخدة ضاني مع الأرز والمقبلات والسلطات (يطلب قبلها بيوم)</p></div><p class="item-price">350 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">وليمة مشاوي الملوك</p><p class="item-desc">تشكيلة كباب، كفتة، شيش، ريش، وسجق مع المقبلات</p></div><p class="item-price">500 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">صينية محاشي مع بطة</p><p class="item-desc">صينية محاشي مشكلة مع بطة محمرة وأرز شرقي</p></div><p class="item-price">280 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">صينية فتة مع 6 موزات</p><p class="item-desc">صينية فتة مع 6 موزات ضاني مطهوة ببطء مع المقبلات</p></div><p class="item-price">360 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">وليمة مكس حمام</p><p class="item-desc">حمام محشو بالأرز والفريك مع أطباق جانبية وسلطات</p></div><p class="item-price">500 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">وليمة خروف مع محاشي</p><p class="item-desc">خروف كامل مع محاشي ومقبلات وسلطات (يطلب قبلها بيوم)</p></div><p class="item-price">1400 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">وليمة خروف مع أرز بالخلطة</p><p class="item-desc">خروف كامل مع الأرز بالخلطة والمكسرات (يطلب قبلها بيوم)</p></div><p class="item-price">1300 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">بطة كاملة مع محاشي</p><p class="item-desc">بطة كاملة محشية مع أصناف محاشي مشكلة وأرز شرقي</p></div><p class="item-price">260 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">ديك رومي في الفرن</p><p class="item-desc">ديك رومي كامل مشوي مع أرز ومقبلات (للحفلات)</p></div><p class="item-price">360 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">صينية رقاق</p><p class="item-desc">صينية رقاق باللحم المفروم، مخبوزة حتى تصبح ذهبية</p></div><p class="item-price">120 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">صينية باشميل</p><p class="item-desc">صينية مكرونة بالباشاميل واللحم المفروم تكفي عدة أشخاص</p></div><p class="item-price">150 AED</p></div>
+                                <div class="menu-item"><div><p class="item-name">صينية أرز معمر باللحمة</p><p class="item-desc">صينية أرز معمر باللحم البقري مطبوخة في الفرن</p></div><p class="item-price">160 AED</p></div>
+                            </div>
+                        </div>
+                        <div class="page-number">8 / 8</div>
+                     </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="nav-buttons">
+        <button id="prev-btn" class="nav-btn">السابق</button>
+        <button id="recommend-btn" class="nav-btn">✨ اقتراح طبق ✨</button> <!-- New LLM-powered button -->
+        <button id="next-btn" class="nav-btn">التالي</button>
+    </div>
+
+    <!-- Modal for LLM Recommendation -->
+    <div id="recommendationModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h3 class="modal-title" id="modalTitle">اقتراح طبق لك</h3>
+            <p class="modal-loading" id="modalLoading">جارٍ التفكير في طبق لذيذ لك...</p>
+            <p class="modal-text" id="modalDishName"></p>
+            <p class="modal-text" id="modalDescription"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const book = document.getElementById('book');
+            const pages = Array.from(book.querySelectorAll('.page'));
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const recommendBtn = document.getElementById('recommend-btn'); // Get the new button
+            const recommendationModal = document.getElementById('recommendationModal');
+            const closeModalBtn = recommendationModal.querySelector('.close-button');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalLoading = document.getElementById('modalLoading');
+            const modalDishName = document.getElementById('modalDishName');
+            const modalDescription = document.getElementById('modalDescription');
+            
+            let currentPageIndex = 0;
+            const totalPages = pages.length; // Dynamically get total pages
+
+            /**
+             * Updates the disabled state of the navigation buttons.
+             */
+            function updateButtons() {
+                prevBtn.disabled = currentPageIndex === 0; // Disable 'Previous' on the first page
+                nextBtn.disabled = currentPageIndex === totalPages - 1; // Disable 'Next' on the last page
+            }
+            
+            /**
+             * Displays the current page and updates the page numbering.
+             * Manages 'active' and 'flipped' classes and z-index for visual flipping effect.
+             */
+            function showCurrentPage() {
+                pages.forEach((page, index) => {
+                    page.classList.remove('flipped', 'active'); // Remove all states first
+                    if (index < currentPageIndex) {
+                        // Pages before the current one are 'flipped'
+                        page.classList.add('flipped');
+                        // Set z-index to create a stacking effect where earlier flipped pages are deeper
+                        page.style.zIndex = totalPages - index; 
+                        page.style.display = 'block'; // Keep flipped pages visible to show the stack
+                    } else if (index === currentPageIndex) {
+                        // The current active page
+                        page.classList.add('active');
+                        // Ensure the active page is always on top
+                        page.style.zIndex = totalPages + 1;
+                        page.style.display = 'block';
+                    } else {
+                        // Pages after the current one are hidden
+                        page.style.display = 'none';
+                    }
+                    // Update page number display for each page
+                    const pageNumElement = page.querySelector('.page-number');
+                    if (pageNumElement) {
+                        pageNumElement.textContent = `${index + 1} / ${totalPages}`;
+                    }
+                });
+                updateButtons(); // Update button states based on current page
+            }
+
+            /**
+             * Handles the click event for the 'Next' button.
+             * Flips the current page and shows the next one.
+             */
+            nextBtn.addEventListener('click', () => {
+                if (currentPageIndex < totalPages - 1) {
+                    const currentPage = pages[currentPageIndex];
+                    currentPage.classList.add('flipped'); // Start flip animation
+                    currentPage.classList.remove('active'); // No longer active
+                    currentPage.style.zIndex = totalPages - currentPageIndex; // Adjust z-index for flipped page
+                    
+                    currentPageIndex++; // Move to the next page
+                    
+                    const nextPage = pages[currentPageIndex];
+                    nextPage.style.display = 'block'; // Make the next page visible immediately
+                    // A small timeout to ensure the display property takes effect before adding 'active'
+                    // This can help prevent a flicker in some browsers
+                    setTimeout(() => {
+                       nextPage.classList.add('active'); // Make the next page active
+                       nextPage.style.zIndex = totalPages + 1; // Ensure it's on top
+                    }, 10);
+
+                    updateButtons(); // Update button states
+                }
+            });
+
+            /**
+             * Handles the click event for the 'Previous' button.
+             * Un-flips the previous page to become the current one.
+             */
+            prevBtn.addEventListener('click', () => {
+                if (currentPageIndex > 0) {
+                    // Get the page that will become active (the one before the current)
+                   const previousPage = pages[currentPageIndex - 1];
+                   previousPage.classList.remove('flipped'); // Un-flip it
+                   previousPage.classList.add('active'); // Make it active
+                   previousPage.style.zIndex = totalPages + 1; // Bring to front
+
+                   // The current page needs to be hidden after its transition completes
+                   const currentPage = pages[currentPageIndex];
+                   currentPage.classList.remove('active'); // No longer active
+                    // Hide the page after the flip animation (1 second transition)
+                    setTimeout(() => {
+                        currentPage.style.display = 'none';
+                    }, 1000); 
+                    
+                   currentPageIndex--; // Move to the previous page
+                   updateButtons(); // Update button states
+                }
+            });
+
+            // Function to collect all menu items
+            function getAllMenuItems() {
+                const allItems = [];
+                pages.forEach(page => {
+                    const categoryTitle = page.querySelector('.category-title');
+                    const categoryName = categoryTitle ? categoryTitle.textContent.split('|')[0].trim() : 'Unknown Category';
+                    page.querySelectorAll('.menu-item').forEach(itemElement => {
+                        const name = itemElement.querySelector('.item-name').textContent;
+                        const desc = itemElement.querySelector('.item-desc').textContent;
+                        const price = itemElement.querySelector('.item-price').textContent;
+                        allItems.push({ category: categoryName, name, desc, price });
+                    });
+                });
+                return allItems;
+            }
+
+            // LLM Integration for Dish Recommendation
+            recommendBtn.addEventListener('click', async () => {
+                recommendationModal.classList.remove('hidden');
+                modalLoading.classList.remove('hidden');
+                modalDishName.textContent = '';
+                modalDescription.textContent = '';
+                modalTitle.textContent = 'جارٍ اقتراح طبق...';
+
+                const menuItems = getAllMenuItems();
+                // Filter is removed as there are no 'مشروبات' or 'حلويات' categories anymore
+                const menuText = JSON.stringify(menuItems); 
+
+                const prompt = `Based on the following Egyptian restaurant menu, suggest one main dish or feast item that would be a good recommendation for a customer looking for an authentic and satisfying meal. Provide the dish name in Arabic and a short, enticing description in Arabic. Format your response as a JSON object with 'dishName' and 'description' keys.
+                
+                Menu: ${menuText}`;
+
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                
+                const payload = {
+                    contents: chatHistory,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                "dishName": { "type": "STRING" },
+                                "description": { "type": "STRING" }
+                            },
+                            propertyOrdering: ["dishName", "description"]
+                        }
+                    }
+                };
+
+                const apiKey = ""; // Canvas will automatically provide the API key
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json();
+
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        const json = result.candidates[0].content.parts[0].text;
+                        const parsedJson = JSON.parse(json);
+
+                        modalLoading.classList.add('hidden');
+                        modalTitle.textContent = 'اقتراحنا لك:';
+                        modalDishName.textContent = parsedJson.dishName;
+                        modalDescription.textContent = parsedJson.description;
+                    } else {
+                        modalLoading.classList.add('hidden');
+                        modalTitle.textContent = 'عذراً!';
+                        modalDishName.textContent = 'لم نتمكن من العثور على اقتراح.';
+                        modalDescription.textContent = 'الرجاء المحاولة مرة أخرى لاحقاً.';
+                        console.error('Unexpected LLM response structure:', result);
+                    }
+                } catch (error) {
+                    modalLoading.classList.add('hidden');
+                    modalTitle.textContent = 'حدث خطأ!';
+                    modalDishName.textContent = 'تعذر الحصول على اقتراح الطبق.';
+                    modalDescription.textContent = 'الرجاء التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.';
+                    console.error('Error fetching LLM recommendation:', error);
+                }
+            });
+
+            // Close modal functionality
+            closeModalBtn.addEventListener('click', () => {
+                recommendationModal.classList.add('hidden');
+            });
+
+            window.addEventListener('click', (event) => {
+                if (event.target === recommendationModal) {
+                    recommendationModal.classList.add('hidden');
+                }
+            });
+
+            // Initialize the book to show the first page and set button states
+            showCurrentPage();
+        });
+    </script>
+
+</body>
+</html>
